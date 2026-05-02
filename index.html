@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Track your daily spending with charts, categories, and budget limits." />
+  <title>Expense &amp; Budget Visualizer</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <!-- Chart.js from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Storage warning (shown only if localStorage is blocked) -->
+<div id="storage-warning" class="storage-warning" role="alert">
+  ⚠️ Storage unavailable — your data won't be saved between sessions.
+</div>
+
+<div class="app-wrapper">
+
+  <!-- ── Header ─────────────────────────────────────────────── -->
+  <header class="app-header">
+    <h1>💰 Budget Tracker</h1>
+    <div class="header-actions">
+      <button id="theme-toggle" class="theme-toggle" aria-label="Switch to dark mode">
+        🌙 Dark
+      </button>
+    </div>
+  </header>
+
+  <!-- ── Balance Card ───────────────────────────────────────── -->
+  <section class="balance-card" aria-label="Total balance">
+    <div class="balance-label">Total Spent</div>
+    <div id="balance-amount" class="balance-amount" aria-live="polite">$0.00</div>
+    <div id="balance-count" class="balance-count" aria-live="polite">0 transactions</div>
+  </section>
+
+  <!-- ── Navigation Tabs ────────────────────────────────────── -->
+  <nav aria-label="App sections">
+    <div class="nav-tabs" role="tablist">
+      <button class="nav-tab active" role="tab" aria-selected="true"
+              data-view="main" id="tab-main" aria-controls="panel-main">
+        📋 Transactions
+      </button>
+      <button class="nav-tab" role="tab" aria-selected="false"
+              data-view="chart" id="tab-chart" aria-controls="panel-chart">
+        📊 Chart
+      </button>
+      <button class="nav-tab" role="tab" aria-selected="false"
+              data-view="monthly" id="tab-monthly" aria-controls="panel-monthly">
+        📅 Monthly
+      </button>
+      <button class="nav-tab" role="tab" aria-selected="false"
+              data-view="settings" id="tab-settings" aria-controls="panel-settings">
+        ⚙️ Settings
+      </button>
+    </div>
+  </nav>
+
+  <!-- ══════════════════════════════════════════════════════════
+       PANEL: Transactions (main)
+       ══════════════════════════════════════════════════════════ -->
+  <div id="panel-main" class="view-panel active" data-view="main"
+       role="tabpanel" aria-labelledby="tab-main">
+
+    <!-- Alert Banner -->
+    <div id="alert-banner" class="alert-banner" role="alert" aria-live="assertive"></div>
+
+    <!-- Add Transaction Form -->
+    <section class="card" aria-label="Add transaction">
+      <h2 class="card-title">Add Transaction</h2>
+      <form id="transaction-form" novalidate>
+
+        <div class="form-group">
+          <label for="tx-name">Item Name</label>
+          <input type="text" id="tx-name" class="form-control"
+                 placeholder="e.g. Coffee, Bus ticket…"
+                 autocomplete="off"
+                 aria-describedby="tx-name-error"
+                 aria-required="true" />
+          <span id="tx-name-error" class="error-msg" role="alert"></span>
+        </div>
+
+        <div class="form-group">
+          <label for="tx-amount">Amount ($)</label>
+          <input type="number" id="tx-amount" class="form-control"
+                 placeholder="0.00"
+                 min="0.01" step="0.01"
+                 inputmode="decimal"
+                 aria-describedby="tx-amount-error"
+                 aria-required="true" />
+          <span id="tx-amount-error" class="error-msg" role="alert"></span>
+        </div>
+
+        <div class="form-group">
+          <label for="tx-category">Category</label>
+          <select id="tx-category" class="form-control category-select"
+                  aria-describedby="tx-category-error"
+                  aria-required="true">
+            <option value="">Select category…</option>
+            <option value="Food">Food</option>
+            <option value="Transport">Transport</option>
+            <option value="Fun">Fun</option>
+          </select>
+          <span id="tx-category-error" class="error-msg" role="alert"></span>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Add Transaction
+        </button>
+      </form>
+    </section>
+
+    <!-- Transaction List -->
+    <section class="card" aria-label="Transaction history">
+      <h2 class="card-title">Transaction History</h2>
+
+      <div class="transaction-controls">
+        <label for="sort-select">Sort by:</label>
+        <select id="sort-select" class="sort-select" aria-label="Sort transactions">
+          <option value="none">Date added</option>
+          <option value="amount-desc">Amount (high → low)</option>
+          <option value="amount-asc">Amount (low → high)</option>
+          <option value="category-asc">Category (A → Z)</option>
+        </select>
+      </div>
+
+      <div id="transaction-list" role="list" aria-label="Transactions">
+        <div class="empty-state" role="status">
+          <div class="empty-icon">💸</div>
+          <p>No transactions yet.<br>Add one above to get started!</p>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /panel-main -->
+
+  <!-- ══════════════════════════════════════════════════════════
+       PANEL: Chart
+       ══════════════════════════════════════════════════════════ -->
+  <div id="panel-chart" class="view-panel" data-view="chart"
+       role="tabpanel" aria-labelledby="tab-chart">
+
+    <section class="card" aria-label="Spending chart">
+      <h2 class="card-title">Spending by Category</h2>
+
+      <div class="chart-container" aria-label="Pie chart of spending by category">
+        <canvas id="spending-chart" aria-label="Spending distribution pie chart"></canvas>
+        <div id="chart-empty" class="chart-empty" role="status" style="display:none">
+          No spending data yet. Add some transactions!
+        </div>
+        <div id="chart-fallback" class="chart-fallback" role="status">
+          Chart unavailable — please check your connection.
+        </div>
+      </div>
+
+      <div id="chart-legend" class="chart-legend" aria-label="Chart legend"></div>
+    </section>
+
+  </div><!-- /panel-chart -->
+
+  <!-- ══════════════════════════════════════════════════════════
+       PANEL: Monthly Summary
+       ══════════════════════════════════════════════════════════ -->
+  <div id="panel-monthly" class="view-panel" data-view="monthly"
+       role="tabpanel" aria-labelledby="tab-monthly">
+
+    <section class="card" aria-label="Monthly spending summary">
+      <h2 class="card-title">Monthly Summary</h2>
+      <div id="monthly-summary">
+        <div class="empty-state" role="status">
+          <div class="empty-icon">📅</div>
+          <p>No transactions to summarize yet.</p>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /panel-monthly -->
+
+  <!-- ══════════════════════════════════════════════════════════
+       PANEL: Settings
+       ══════════════════════════════════════════════════════════ -->
+  <div id="panel-settings" class="view-panel" data-view="settings"
+       role="tabpanel" aria-labelledby="tab-settings">
+
+    <!-- Custom Categories -->
+    <section class="card" aria-label="Manage categories">
+      <h2 class="card-title">Custom Categories</h2>
+      <form id="category-form" novalidate>
+        <div class="form-group">
+          <label for="new-category">New Category Name</label>
+          <div class="inline-row">
+            <input type="text" id="new-category" class="form-control"
+                   placeholder="e.g. Health, Shopping…"
+                   autocomplete="off"
+                   aria-describedby="new-category-error"
+                   aria-required="true" />
+            <button type="submit" id="add-category-btn" class="btn btn-secondary btn-sm"
+                    style="white-space:nowrap">
+              + Add
+            </button>
+          </div>
+          <span id="new-category-error" class="error-msg" role="alert"></span>
+        </div>
+      </form>
+    </section>
+
+    <!-- Spending Limits -->
+    <section class="card" aria-label="Spending limits">
+      <h2 class="card-title">Spending Limits</h2>
+      <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;">
+        Set a monthly limit per category. Transactions will be highlighted when exceeded.
+      </p>
+      <div id="limits-list" class="limits-list"></div>
+    </section>
+
+  </div><!-- /panel-settings -->
+
+</div><!-- /app-wrapper -->
+
+<script src="js/app.js" defer></script>
+</body>
+</html>
